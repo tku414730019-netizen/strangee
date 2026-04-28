@@ -22,6 +22,13 @@ let isMirror   = false;
 let handPose;
 let hands = [];
 
+let trail = [];        // 軌跡
+let maxTrail = 20;
+
+let portalActive = false;
+let portalX = 0;
+let portalY = 0;
+
 // ── 指尖粒子系統 ───────────────────────────────────────────
 let tips = [];
 const TIP_INDICES    = [4, 8, 12, 16, 20];
@@ -138,6 +145,10 @@ function draw() {
   updateTips();
   drawTips();
 
+  if (portalActive) {
+    drawPortal(portalX, portalY);
+  }
+
   // 3. 繪製手部 (mapToCanvas 會處理內部的鏡像對位)
   if (hands.length > 0) {
     for (let hand of hands) {
@@ -166,11 +177,92 @@ function draw() {
           }
         }
       }
+      if (hand.handedness === "Right") {
+        const tip = hand.keypoints[8]; // 食指
+        const p = mapToCanvas(tip.x, tip.y, x, y, w, h, vw, vh);
+
+        trail.push({x: p.px, y: p.py});
+        if (trail.length > maxTrail) trail.shift();
+
+        detectCircle();
+      }
     }
   }
 
   push(); blendMode(MULTIPLY); image(noiseTexture, 0, 0, width, height); pop();
+
+  // ── 傳送門顯示 ─────────────────────
+  if (portalActive) {
+    drawPortal(portalX, portalY);
+
+    portalTimer--;
+
+    if (portalTimer <= 0) {
+      portalActive = false;
+    }
+  }
+
   drawUIElements(x, y, w, h);
+}
+
+
+function detectCircle() {
+  if (trail.length < maxTrail) return;
+
+  let start = trail[0];
+  let end   = trail[trail.length - 1];
+
+  // 回到起點附近
+  let d = dist(start.x, start.y, end.x, end.y);
+
+  // 路徑總長
+  let total = 0;
+  for (let i = 1; i < trail.length; i++) {
+    total += dist(trail[i].x, trail[i].y, trail[i-1].x, trail[i-1].y);
+  }
+
+  if (d < 30 && total > 200) {
+    portalActive = true;
+    portalTimer = 60; // ⬅️ 大約 1 秒（60fps）
+
+    // 計算中心
+    let cx = 0, cy = 0;
+    for (let p of trail) {
+      cx += p.x;
+      cy += p.y;
+    }
+
+    portalX = cx / trail.length;
+    portalY = cy / trail.length;
+
+    trail = []; // 重置避免連續觸發
+  }
+}
+
+function drawPortal(x, y) {
+  push();
+  translate(x, y);
+
+  rotate(frameCount * 0.05);
+
+  for (let i = 0; i < 60; i++) {
+    let angle = TWO_PI * i / 60;
+    let r = 80 + sin(frameCount * 0.1 + i) * 10;
+
+    let x1 = cos(angle) * r;
+    let y1 = sin(angle) * r;
+
+    stroke(255, 180, 0, 150);
+    strokeWeight(2);
+    line(0, 0, x1, y1);
+  }
+
+  // 中心光
+  noStroke();
+  fill(255, 200, 50, 180);
+  circle(0, 0, 40);
+
+  pop();
 }
 
 // ── 關節座標映射 ───────────────────────────────────────────
