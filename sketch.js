@@ -221,7 +221,7 @@ function detectCircle() {
     total += dist(trail[i].x, trail[i].y, trail[i-1].x, trail[i-1].y);
   }
 
-  if (d < 30 && total > 200) {
+  if (d < 40 && total > 250) { 
     portalActive = true;
     portalTimer = 60; // ⬅️ 大約 1 秒（60fps）
 
